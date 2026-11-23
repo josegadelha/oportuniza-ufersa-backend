@@ -1,6 +1,7 @@
 package br.edu.ufersa.oportuniza.project;
 
 import br.edu.ufersa.oportuniza.auth.AuthenticatedUser;
+import br.edu.ufersa.oportuniza.project.dto.ProjectFromSelectionCreate;
 import br.edu.ufersa.oportuniza.project.dto.ProjectPatch;
 import br.edu.ufersa.oportuniza.project.dto.ProjectResponse;
 import br.edu.ufersa.oportuniza.project.dto.ProjectUpdate;
@@ -11,11 +12,14 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 
 @RestController
@@ -26,6 +30,24 @@ public class ProjectController {
 
     public ProjectController(ProjectApplicationService service) {
         this.service = service;
+    }
+
+    @PostMapping("/opportunities/{opportunityId}/projects")
+    @PreAuthorize("hasRole('PROFESSOR')")
+    public ResponseEntity<ProjectResponse> createFromSelection(
+            @PathVariable Long opportunityId,
+            @RequestBody @Valid ProjectFromSelectionCreate dto,
+            @AuthenticationPrincipal AuthenticatedUser principal,
+            UriComponentsBuilder uriBuilder) {
+        ProjectResponse response = service.createFromSelection(
+                opportunityId,
+                dto,
+                principal.getUser()
+        );
+        URI uri = uriBuilder.path("/api/v1/projects/{id}")
+                .buildAndExpand(response.id())
+                .toUri();
+        return ResponseEntity.created(uri).body(response);
     }
 
     @GetMapping("/projects")
