@@ -11,6 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -62,5 +63,21 @@ public class SubmissionController {
         URI uri = uriBuilder.path("/api/v1/submissions/{id}")
                 .buildAndExpand(result.response().id()).toUri();
         return ResponseEntity.created(uri).body(result.response());
+    }
+
+    @PatchMapping("/submissions/{submissionId}/approve")
+    @PreAuthorize("hasRole('PROFESSOR')")
+    public ResponseEntity<SubmissionResponse> approve(
+            @PathVariable Long submissionId,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(service.approve(submissionId, principal.getUser()));
+    }
+
+    @PatchMapping("/submissions/{submissionId}/reject")
+    @PreAuthorize("hasRole('PROFESSOR')")
+    public ResponseEntity<SubmissionResponse> reject(
+            @PathVariable Long submissionId,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        return ResponseEntity.ok(service.reject(submissionId, principal.getUser()));
     }
 }

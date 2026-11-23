@@ -84,6 +84,18 @@ public class Submission {
         transitionTo(SubmissionStatus.REJECTED);
     }
 
+    public void updateReview(SubmissionStatus nextStatus) {
+        if (nextStatus == SubmissionStatus.APPROVED) {
+            approve();
+        } else if (nextStatus == SubmissionStatus.REJECTED) {
+            reject();
+        } else {
+            throw new SubmissionRuleViolationException(
+                    "A avaliação deve aprovar ou rejeitar a submissão."
+            );
+        }
+    }
+
     private void transitionTo(SubmissionStatus next) {
         if (!status.canTransitionTo(next)) {
             throw new SubmissionRuleViolationException("Transição inválida da submissão.");

@@ -5,6 +5,8 @@ import br.edu.ufersa.oportuniza.project.Project;
 import br.edu.ufersa.oportuniza.project.ProjectService;
 import br.edu.ufersa.oportuniza.project.ProjectStatus;
 import br.edu.ufersa.oportuniza.shared.exception.SubmissionRuleViolationException;
+import br.edu.ufersa.oportuniza.shared.exception.ResourceAccessDeniedException;
+import br.edu.ufersa.oportuniza.professor.Professor;
 import br.edu.ufersa.oportuniza.student.Student;
 import br.edu.ufersa.oportuniza.user.User;
 import br.edu.ufersa.oportuniza.shared.exception.ResourceAccessDeniedException;
@@ -38,6 +40,13 @@ public class SubmissionService {
 
     public void requireReader(Submission submission, User actor) {
         if (submission.getStudent().getId().equals(actor.getId())) return;
+        projects.requireAdvisor(submission.getDeliverable().getProject(), actor);
+    }
+
+    public void requireReviewer(Submission submission, User actor) {
+        if (!(actor instanceof Professor)) {
+            throw new ResourceAccessDeniedException("Somente professores orientadores podem avaliar submissões.");
+        }
         projects.requireAdvisor(submission.getDeliverable().getProject(), actor);
     }
 }
