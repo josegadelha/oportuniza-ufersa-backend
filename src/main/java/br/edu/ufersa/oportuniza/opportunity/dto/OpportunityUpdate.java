@@ -1,7 +1,6 @@
 package br.edu.ufersa.oportuniza.opportunity.dto;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import br.edu.ufersa.oportuniza.opportunity.OpportunityStatus;
@@ -36,9 +35,6 @@ public record OpportunityUpdate(
 
         @NotNull(message = "O status é obrigatório!")
         OpportunityStatus status,
-
-        @NotNull(message = "A data de publicação é obrigatória!")
-        LocalDateTime publishedAt,
 
         LocalDate applicationDeadline,
 

@@ -21,9 +21,4 @@ class OpportunityService {
         return professor;
     }
 
-    public void requireReader(Opportunity opportunity, User actor) {
-        if (opportunity.getProfessor().getId().equals(actor.getId())) {
-            return;
-        }
-    }
 }

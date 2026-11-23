@@ -1,17 +1,24 @@
 package br.edu.ufersa.oportuniza.project;
 
+import br.edu.ufersa.oportuniza.candidacy.CandidacyInternalApi;
+import br.edu.ufersa.oportuniza.opportunity.OpportunityInternalApi;
+import br.edu.ufersa.oportuniza.opportunity.OpportunityStatus;
+import br.edu.ufersa.oportuniza.opportunity.OpportunitySummary;
 import br.edu.ufersa.oportuniza.professor.Professor;
+import br.edu.ufersa.oportuniza.professor.ProfessorRepository;
+import br.edu.ufersa.oportuniza.project.dto.ProjectFromSelectionCreate;
 import br.edu.ufersa.oportuniza.project.dto.ProjectPatch;
 import br.edu.ufersa.oportuniza.project.dto.ProjectResponse;
 import br.edu.ufersa.oportuniza.project.dto.ProjectUpdate;
-import br.edu.ufersa.oportuniza.shared.exception.ResourceNotFoundException;
 import br.edu.ufersa.oportuniza.shared.exception.ProjectRuleViolationException;
+import br.edu.ufersa.oportuniza.shared.exception.ResourceAccessDeniedException;
+import br.edu.ufersa.oportuniza.shared.exception.ResourceNotFoundException;
 import br.edu.ufersa.oportuniza.student.Student;
+import br.edu.ufersa.oportuniza.student.StudentRepository;
 import br.edu.ufersa.oportuniza.user.User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -20,12 +27,22 @@ public class ProjectApplicationService {
     private final ProjectRepository repository;
     private final ProjectService domain;
     private final ProjectMapper mapper;
+    private final OpportunityInternalApi opportunities;
+    private final CandidacyInternalApi candidacies;
+    private final ProfessorRepository professors;
+    private final StudentRepository students;
 
     public ProjectApplicationService(ProjectRepository repository, ProjectService domain,
-                                     ProjectMapper mapper) {
+                                     ProjectMapper mapper, OpportunityInternalApi opportunities,
+                                     CandidacyInternalApi candidacies, ProfessorRepository professors,
+                                     StudentRepository students) {
         this.repository = repository;
         this.domain = domain;
         this.mapper = mapper;
+        this.opportunities = opportunities;
+        this.candidacies = candidacies;
+        this.professors = professors;
+        this.students = students;
     }
 
     @Transactional(readOnly = true)
@@ -75,15 +92,38 @@ public class ProjectApplicationService {
         return mapper.toResponse(project);
     }
 
-    // Ponto de integração para a seleção concluída, sem endpoint de criação manual.
     @Transactional
-    public Project createFromSelection(String title, LocalDate startDate,
-                                       List<Professor> advisors, List<Student> members) {
-        if (members == null || members.isEmpty()) {
+    public ProjectResponse createFromSelection(Long opportunityId, ProjectFromSelectionCreate dto, User user) {
+        OpportunitySummary opportunity = opportunities.lockForSelectionFinalization(opportunityId);
+        if (!(user instanceof Professor) || !opportunity.professorId().equals(user.getId())) {
+            throw new ResourceAccessDeniedException("Somente o professor responsável pode finalizar esta seleção.");
+        }
+        if (opportunity.status() != OpportunityStatus.OPEN && opportunity.status() != OpportunityStatus.CLOSED) {
+            throw new ProjectRuleViolationException(
+                    "A seleção desta oportunidade já foi finalizada ou ainda não está disponível."
+            );
+        }
+
+        List<Long> approvedStudentIds = candidacies.findApprovedStudentIds(opportunityId);
+        if (approvedStudentIds.isEmpty()) {
             throw new ProjectRuleViolationException("O projeto precisa de estudantes selecionados.");
         }
-        Project project = mapper.toEntity(title, startDate, advisors, members);
-        return repository.save(project);
+        List<Student> members = students.findAllById(approvedStudentIds);
+        if (members.size() != approvedStudentIds.size()) {
+            throw new ResourceNotFoundException("Um ou mais estudantes aprovados não foram encontrados.");
+        }
+        Professor advisor = professors.findById(opportunity.professorId())
+                .orElseThrow(() -> new ResourceNotFoundException("Professor não encontrado."));
+
+        Project project = mapper.toEntity(
+                opportunity.title(),
+                dto.startDate(),
+                List.of(advisor),
+                members
+        );
+        Project saved = repository.save(project);
+        opportunities.finishSelection(opportunityId);
+        return mapper.toResponse(saved);
     }
 
     private Project findProject(Long id) {

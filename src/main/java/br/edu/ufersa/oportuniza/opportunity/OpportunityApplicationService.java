@@ -1,7 +1,6 @@
 package br.edu.ufersa.oportuniza.opportunity;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -14,6 +13,7 @@ import br.edu.ufersa.oportuniza.opportunity.dto.OpportunityUpdate;
 import br.edu.ufersa.oportuniza.professor.Professor;
 import br.edu.ufersa.oportuniza.professor.ProfessorRepository;
 import br.edu.ufersa.oportuniza.shared.exception.ResourceNotFoundException;
+import br.edu.ufersa.oportuniza.user.User;
 
 @Service
 class OpportunityApplicationService {
@@ -21,15 +21,18 @@ class OpportunityApplicationService {
     private final OpportunityRepository repository;
     private final ProfessorRepository professors;
     private final OpportunityMapper mapper;
+    private final OpportunityService domain;
 
     public OpportunityApplicationService(
             OpportunityRepository repository,
             ProfessorRepository professors,
-            OpportunityMapper mapper
+            OpportunityMapper mapper,
+            OpportunityService domain
     ) {
         this.repository = repository;
         this.professors = professors;
         this.mapper = mapper;
+        this.domain = domain;
     }
 
     @Transactional(readOnly = true)
@@ -56,16 +59,21 @@ class OpportunityApplicationService {
     }
 
     @Transactional
-    public OpportunityResponse update(Long opportunityId, OpportunityUpdate dto) {
-        Opportunity current = findOpportunity(opportunityId);
-        Professor professor = current.getProfessor();
-        Opportunity updated = mapper.fromUpdate(current, dto, professor);
-        return mapper.toResponse(repository.save(updated));
+    public OpportunityResponse update(Long opportunityId, OpportunityUpdate dto, User user) {
+        Opportunity current = findOpportunityForUpdate(opportunityId);
+        domain.requireOwner(current, user);
+        current.updateDetails(
+                dto.title(), dto.description(), dto.type(), dto.positions(),
+                dto.workloadHours(), dto.remuneration(), dto.applicationDeadline(), dto.requirements()
+        );
+        current.updateStatus(dto.status());
+        return mapper.toResponse(repository.save(current));
     }
 
     @Transactional
-    public OpportunityResponse partialUpdate(Long opportunityId, OpportunityPatch dto) {
-        Opportunity current = findOpportunity(opportunityId);
+    public OpportunityResponse partialUpdate(Long opportunityId, OpportunityPatch dto, User user) {
+        Opportunity current = findOpportunityForUpdate(opportunityId);
+        domain.requireOwner(current, user);
 
         String title = current.getTitle();
         String description = current.getDescription();
@@ -73,8 +81,6 @@ class OpportunityApplicationService {
         Integer positions = current.getPositions();
         Integer workloadHours = current.getWorkloadHours();
         Double remuneration = current.getRemuneration();
-        OpportunityStatus status = current.getStatus();
-        LocalDateTime publishedAt = current.getPublishedAt();
         LocalDate applicationDeadline = current.getApplicationDeadline();
         List<String> requirements = current.getRequirements();
 
@@ -96,12 +102,6 @@ class OpportunityApplicationService {
         if (dto.remuneration() != null) {
             remuneration = dto.remuneration();
         }
-        if (dto.status() != null) {
-            status = dto.status();
-        }
-        if (dto.publishedAt() != null) {
-            publishedAt = dto.publishedAt();
-        }
         if (dto.applicationDeadline() != null) {
             applicationDeadline = dto.applicationDeadline();
         }
@@ -109,23 +109,21 @@ class OpportunityApplicationService {
             requirements = dto.requirements();
         }
 
-        Opportunity updated = new Opportunity.Builder(current.getProfessor(), title, description, type)
-                .withId(current.getId())
-                .withPositions(positions)
-                .withWorkloadHours(workloadHours)
-                .withRemuneration(remuneration)
-                .withStatus(status)
-                .withPublishedAt(publishedAt)
-                .withApplicationDeadline(applicationDeadline)
-                .withRequirements(requirements)
-                .build();
-
-        return mapper.toResponse(repository.save(updated));
+        current.updateDetails(
+                title, description, type, positions, workloadHours,
+                remuneration, applicationDeadline, requirements
+        );
+        if (dto.status() != null) {
+            current.updateStatus(dto.status());
+        }
+        return mapper.toResponse(repository.save(current));
     }
 
     @Transactional
-    public void remove(Long opportunityId) {
-        repository.delete(findOpportunity(opportunityId));
+    public void remove(Long opportunityId, User user) {
+        Opportunity opportunity = findOpportunityForUpdate(opportunityId);
+        domain.requireOwner(opportunity, user);
+        repository.delete(opportunity);
     }
 
     private Opportunity findOpportunity(Long opportunityId) {
@@ -133,8 +131,14 @@ class OpportunityApplicationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Oportunidade não encontrada."));
     }
 
+    private Opportunity findOpportunityForUpdate(Long opportunityId) {
+        return repository.findByIdForUpdate(opportunityId)
+                .orElseThrow(() -> new ResourceNotFoundException("Oportunidade não encontrada."));
+    }
+
     private Professor findProfessor(Long professorId) {
         return professors.findById(professorId)
                 .orElseThrow(() -> new ResourceNotFoundException("Professor não encontrado."));
     }
+
 }

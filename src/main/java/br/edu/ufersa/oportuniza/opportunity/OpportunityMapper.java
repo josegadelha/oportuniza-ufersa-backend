@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 
 import br.edu.ufersa.oportuniza.opportunity.dto.OpportunityCreate;
 import br.edu.ufersa.oportuniza.opportunity.dto.OpportunityResponse;
-import br.edu.ufersa.oportuniza.opportunity.dto.OpportunityUpdate;
 import br.edu.ufersa.oportuniza.professor.Professor;
 
 @Component
@@ -26,8 +25,6 @@ class OpportunityMapper {
                 .withPositions(dto.positions())
                 .withWorkloadHours(dto.workloadHours())
                 .withRemuneration(dto.remuneration())
-                .withStatus(dto.status() != null ? dto.status() : OpportunityStatus.DRAFT)
-                .withPublishedAt(dto.publishedAt())
                 .withApplicationDeadline(dto.applicationDeadline())
                 .withRequirements(dto.requirements())
                 .build();
@@ -62,21 +59,4 @@ class OpportunityMapper {
         return opportunities.stream().map(this::toResponse).toList();
     }
 
-    public Opportunity fromUpdate(Opportunity current, OpportunityUpdate dto, Professor professor) {
-        return new Opportunity.Builder(
-                professor,
-                dto.title(),
-                dto.description(),
-                dto.type()
-        )
-                .withId(current.getId())
-                .withPositions(dto.positions())
-                .withWorkloadHours(dto.workloadHours())
-                .withRemuneration(dto.remuneration())
-                .withStatus(dto.status())
-                .withPublishedAt(dto.publishedAt() != null ? dto.publishedAt() : current.getPublishedAt())
-                .withApplicationDeadline(dto.applicationDeadline())
-                .withRequirements(dto.requirements())
-                .build();
-    }
 }

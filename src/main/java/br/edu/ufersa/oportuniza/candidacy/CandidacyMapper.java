@@ -4,22 +4,14 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
-import br.edu.ufersa.oportuniza.candidacy.dto.CandidacyCreate;
 import br.edu.ufersa.oportuniza.candidacy.dto.CandidacyResponse;
 import br.edu.ufersa.oportuniza.student.Student;
 
 @Component
 class CandidacyMapper {
 
-    public Candidacy toEntity(Student student, Long opportunityId, CandidacyCreate dto) {
-        if (dto == null) {
-            return null;
-        }
-
-        return new Candidacy.Builder(student, opportunityId)
-                .withAppliedAt(dto.appliedAt() != null ? dto.appliedAt() : java.time.LocalDateTime.now())
-                .withStatus(dto.status() != null ? dto.status() : CandidacyStatus.IN_SELECTION)
-                .build();
+    public Candidacy toEntity(Student student, Long opportunityId) {
+        return new Candidacy.Builder(student, opportunityId).build();
     }
 
     public CandidacyResponse toResponse(Candidacy candidacy) {

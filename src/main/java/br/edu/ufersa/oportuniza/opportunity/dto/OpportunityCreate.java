@@ -1,10 +1,8 @@
 package br.edu.ufersa.oportuniza.opportunity.dto;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
-import br.edu.ufersa.oportuniza.opportunity.OpportunityStatus;
 import br.edu.ufersa.oportuniza.opportunity.OpportunityType;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
@@ -33,10 +31,6 @@ public record OpportunityCreate(
         @NotNull(message = "A remuneração é obrigatória!")
         @DecimalMin(value = "0.0", message = "A remuneração não pode ser negativa!")
         Double remuneration,
-
-        OpportunityStatus status,
-
-        LocalDateTime publishedAt,
 
         LocalDate applicationDeadline,
 

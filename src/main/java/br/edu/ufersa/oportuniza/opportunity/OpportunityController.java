@@ -84,30 +84,36 @@ public class OpportunityController {
     }
 
     @PutMapping("/opportunities/{opportunityId}")
+    @PreAuthorize("hasRole('PROFESSOR')")
     public ResponseEntity<OpportunityResponse> update(
             @PathVariable Long opportunityId,
-            @RequestBody @Valid OpportunityUpdate dto
+            @RequestBody @Valid OpportunityUpdate dto,
+            @AuthenticationPrincipal AuthenticatedUser principal
     ) {
         return ResponseEntity.ok(
-                service.update(opportunityId, dto)
+                service.update(opportunityId, dto, principal.getUser())
         );
     }
 
     @PatchMapping("/opportunities/{opportunityId}")
+    @PreAuthorize("hasRole('PROFESSOR')")
     public ResponseEntity<OpportunityResponse> partialUpdate(
             @PathVariable Long opportunityId,
-            @RequestBody @Valid OpportunityPatch dto
+            @RequestBody @Valid OpportunityPatch dto,
+            @AuthenticationPrincipal AuthenticatedUser principal
     ) {
         return ResponseEntity.ok(
-                service.partialUpdate(opportunityId, dto)
+                service.partialUpdate(opportunityId, dto, principal.getUser())
         );
     }
 
     @DeleteMapping("/opportunities/{opportunityId}")
+    @PreAuthorize("hasRole('PROFESSOR')")
     public ResponseEntity<Void> remove(
-            @PathVariable Long opportunityId
+            @PathVariable Long opportunityId,
+            @AuthenticationPrincipal AuthenticatedUser principal
     ) {
-        service.remove(opportunityId);
+        service.remove(opportunityId, principal.getUser());
         return ResponseEntity.noContent().build();
     }
 }

@@ -7,6 +7,7 @@ import java.util.List;
 
 import br.edu.ufersa.oportuniza.professor.Professor;
 import br.edu.ufersa.oportuniza.shared.exception.BusinessValidation;
+import br.edu.ufersa.oportuniza.shared.exception.BusinessRuleViolationException;
 import br.edu.ufersa.oportuniza.shared.exception.InvalidBusinessDataException;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -83,14 +84,12 @@ class Opportunity {
         this.id = builder.id;
         this.title = requireText(builder.title, "O título é obrigatório!");
         this.description = requireText(builder.description, "A descrição é obrigatória!");
-        this.publishedAt = builder.publishedAt;
-
         this.professor = builder.professor;
         this.type = builder.type;
         this.positions = builder.positions;
         this.workloadHours = builder.workloadHours;
         this.remuneration = builder.remuneration;
-        this.status = builder.status;
+        this.status = OpportunityStatus.DRAFT;
         this.applicationDeadline = builder.applicationDeadline;
         this.requirements = new ArrayList<>(builder.requirements);
     }
@@ -100,19 +99,80 @@ class Opportunity {
     }
 
     public void publish() {
-        this.status = OpportunityStatus.OPEN;
-
-        if (this.publishedAt == null) {
-            this.publishedAt = LocalDateTime.now();
+        if (status != OpportunityStatus.DRAFT) {
+            throw new BusinessRuleViolationException("Somente oportunidades em rascunho podem ser publicadas.");
         }
+        this.status = OpportunityStatus.OPEN;
+        this.publishedAt = LocalDateTime.now();
     }
 
     public void close() {
+        if (status != OpportunityStatus.OPEN) {
+            throw new BusinessRuleViolationException("Somente oportunidades abertas podem ser encerradas.");
+        }
         this.status = OpportunityStatus.CLOSED;
     }
 
     public void finish() {
+        if (!status.canTransitionTo(OpportunityStatus.FINISHED)) {
+            throw new BusinessRuleViolationException(
+                    "Somente oportunidades abertas ou encerradas podem concluir a seleção."
+            );
+        }
         this.status = OpportunityStatus.FINISHED;
+    }
+
+    public void updateStatus(OpportunityStatus nextStatus) {
+        OpportunityStatus status = BusinessValidation.requireNonNull(
+                nextStatus,
+                "O status da oportunidade é obrigatório."
+        );
+        if (this.status == status) {
+            return;
+        }
+        if (status == OpportunityStatus.FINISHED) {
+            throw new BusinessRuleViolationException(
+                    "Finalize a seleção pela ação de criação do projeto."
+            );
+        }
+        if (!this.status.canTransitionTo(status)) {
+            throw new BusinessRuleViolationException("Transição de status inválida para a oportunidade.");
+        }
+        switch (status) {
+            case OPEN -> publish();
+            case CLOSED -> close();
+            case DRAFT, FINISHED -> throw new BusinessRuleViolationException(
+                    "Transição de status inválida para a oportunidade."
+            );
+        }
+    }
+
+    public void updateDetails(String title, String description, OpportunityType type,
+                              Integer positions, Integer workloadHours, Double remuneration,
+                              LocalDate applicationDeadline, List<String> requirements) {
+        if (status == OpportunityStatus.FINISHED) {
+            throw new BusinessRuleViolationException("Oportunidades finalizadas não podem ser alteradas.");
+        }
+        String updatedTitle = requireText(title, "O título é obrigatório!");
+        String updatedDescription = requireText(description, "A descrição é obrigatória!");
+        OpportunityType updatedType = BusinessValidation.requireNonNull(
+                type,
+                "O tipo da oportunidade é obrigatório!"
+        );
+        Builder.validatePositions(positions);
+        Builder.validateWorkloadHours(workloadHours);
+        Builder.validateRemuneration(remuneration);
+        this.title = updatedTitle;
+        this.description = updatedDescription;
+        this.type = updatedType;
+        this.positions = positions;
+        this.workloadHours = workloadHours;
+        this.remuneration = remuneration;
+        this.applicationDeadline = applicationDeadline;
+        this.requirements.clear();
+        if (requirements != null) {
+            this.requirements.addAll(requirements);
+        }
     }
 
     public Professor getProfessor() {
@@ -165,7 +225,7 @@ class Opportunity {
 
     private static String requireText(String value, String message) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(message);
+            throw new InvalidBusinessDataException(message);
         }
         return value;
     }
@@ -182,8 +242,6 @@ class Opportunity {
         private Integer positions = 1;
         private Integer workloadHours = 0;
         private Double remuneration = 0.0;
-        private OpportunityStatus status = OpportunityStatus.DRAFT;
-        private LocalDateTime publishedAt;
         private LocalDate applicationDeadline;
         private List<String> requirements = new ArrayList<>();
 
@@ -219,16 +277,6 @@ class Opportunity {
         public Builder withRemuneration(Double remuneration) {
             validateRemuneration(remuneration);
             this.remuneration = remuneration;
-            return this;
-        }
-
-        public Builder withStatus(OpportunityStatus status) {
-            this.status = BusinessValidation.requireNonNull(status, "O status é obrigatório!");
-            return this;
-        }
-
-        public Builder withPublishedAt(LocalDateTime publishedAt) {
-            this.publishedAt = publishedAt;
             return this;
         }
 

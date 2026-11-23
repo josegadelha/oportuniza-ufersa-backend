@@ -1,7 +1,6 @@
 package br.edu.ufersa.oportuniza.opportunity.dto;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 import br.edu.ufersa.oportuniza.opportunity.OpportunityStatus;
@@ -30,8 +29,6 @@ public record OpportunityPatch(
         Double remuneration,
 
         OpportunityStatus status,
-
-        LocalDateTime publishedAt,
 
         LocalDate applicationDeadline,
 

@@ -5,7 +5,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import br.edu.ufersa.oportuniza.proposal.ProposalStatus;
+import br.edu.ufersa.oportuniza.shared.exception.BusinessRuleViolationException;
 import br.edu.ufersa.oportuniza.shared.exception.BusinessValidation;
+import br.edu.ufersa.oportuniza.shared.exception.InvalidBusinessDataException;
 import br.edu.ufersa.oportuniza.student.Student;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
@@ -63,7 +65,6 @@ class ProjectProposal {
     }
 
     private ProjectProposal(Builder builder) {
-        this.id = builder.id;
         this.title = requireText(
                 builder.title,
                 "O título é obrigatório!"
@@ -72,17 +73,38 @@ class ProjectProposal {
                 builder.description,
                 "A descrição é obrigatória!"
         );
-        this.publishedAt = builder.publishedAt;
+        this.publishedAt = LocalDateTime.now();
         this.student = builder.student;
-        this.status = builder.status;
+        this.status = ProposalStatus.OPEN;
         this.desiredSkills = new ArrayList<>(builder.desiredSkills);
     }
 
     public void updateStatus(ProposalStatus status) {
-        this.status = BusinessValidation.requireNonNull(
+        ProposalStatus nextStatus = BusinessValidation.requireNonNull(
                 status,
                 "O status da proposta é obrigatório!"
         );
+        if (this.status == nextStatus) {
+            return;
+        }
+        if (!this.status.canTransitionTo(nextStatus)) {
+            throw new BusinessRuleViolationException("Transição de status inválida para a proposta.");
+        }
+        this.status = nextStatus;
+    }
+
+    public void updateDetails(String title, String description, List<String> desiredSkills) {
+        if (status == ProposalStatus.CLOSED) {
+            throw new BusinessRuleViolationException("Propostas encerradas não podem ser alteradas.");
+        }
+        String updatedTitle = requireText(title, "O título é obrigatório!");
+        String updatedDescription = requireText(description, "A descrição é obrigatória!");
+        this.title = updatedTitle;
+        this.description = updatedDescription;
+        this.desiredSkills.clear();
+        if (desiredSkills != null) {
+            this.desiredSkills.addAll(desiredSkills);
+        }
     }
 
     public Student getStudent() {
@@ -118,7 +140,7 @@ class ProjectProposal {
             String message
     ) {
         if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(message);
+            throw new InvalidBusinessDataException(message);
         }
 
         return value;
@@ -126,14 +148,10 @@ class ProjectProposal {
 
     static class Builder {
 
-        private Long id;
-
         private final Student student;
         private final String title;
         private final String description;
 
-        private ProposalStatus status = ProposalStatus.OPEN;
-        private LocalDateTime publishedAt;
         private List<String> desiredSkills = new ArrayList<>();
 
         Builder(
@@ -148,25 +166,6 @@ class ProjectProposal {
 
             this.title = title;
             this.description = description;
-        }
-
-        Builder withId(Long id) {
-            this.id = id;
-            return this;
-        }
-
-        Builder withStatus(ProposalStatus status) {
-            this.status = BusinessValidation.requireNonNull(
-                    status,
-                    "O status da proposta é obrigatório!"
-            );
-
-            return this;
-        }
-
-        Builder withPublishedAt(LocalDateTime publishedAt) {
-            this.publishedAt = publishedAt;
-            return this;
         }
 
         Builder withDesiredSkills(List<String> desiredSkills) {

@@ -3,6 +3,7 @@ package br.edu.ufersa.oportuniza.candidacy;
 import java.time.LocalDateTime;
 
 import br.edu.ufersa.oportuniza.shared.exception.BusinessValidation;
+import br.edu.ufersa.oportuniza.shared.exception.BusinessRuleViolationException;
 import br.edu.ufersa.oportuniza.student.Student;
 
 import jakarta.persistence.Column;
@@ -63,7 +64,7 @@ class Candidacy {
         );
 
         if (!isValidTransition(this.status, status)) {
-            throw new IllegalArgumentException(
+            throw new BusinessRuleViolationException(
                     "Transição de status inválida para a candidatura."
             );
         }

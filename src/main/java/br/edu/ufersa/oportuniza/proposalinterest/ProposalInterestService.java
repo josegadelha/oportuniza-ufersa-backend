@@ -37,14 +37,10 @@ class ProposalInterestService {
         }
     }
 
-    public void requireInterestOwner(
-        ProposalInterest interest,
-        User actor
-    ) {
-        if (!interest.getUser().getId().equals(actor.getId())) {
-            throw new AccessDeniedException(
-                "Somente o autor do interesse pode realizar esta operação."
-            );
+    public void requireDeleteAccess(ProposalInterest interest, User actor) {
+        if (interest.getUser().getId().equals(actor.getId())) {
+            return;
         }
+        requireProposalOwner(interest.getProjectProposalId(), actor);
     }
 }

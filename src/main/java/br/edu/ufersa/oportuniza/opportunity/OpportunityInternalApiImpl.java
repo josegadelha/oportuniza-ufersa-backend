@@ -21,6 +21,40 @@ class OpportunityInternalApiImpl implements OpportunityInternalApi {
                 .orElseThrow(() -> new ResourceNotFoundException("Oportunidade não encontrada."));
         return new OpportunitySummary(
                 opportunity.getId(),
+                opportunity.getTitle(),
+                opportunity.getProfessor().getId(),
+                opportunity.getStatus()
+        );
+    }
+
+    @Override
+    @Transactional
+    public OpportunitySummary lockForSelectionFinalization(Long opportunityId) {
+        Opportunity opportunity = repository.findByIdForUpdate(opportunityId)
+                .orElseThrow(() -> new ResourceNotFoundException("Oportunidade não encontrada."));
+        return summarize(opportunity);
+    }
+
+    @Override
+    @Transactional
+    public OpportunitySummary lockForCandidacyUpdate(Long opportunityId) {
+        Opportunity opportunity = repository.findByIdForUpdate(opportunityId)
+                .orElseThrow(() -> new ResourceNotFoundException("Oportunidade não encontrada."));
+        return summarize(opportunity);
+    }
+
+    @Override
+    @Transactional
+    public void finishSelection(Long opportunityId) {
+        Opportunity opportunity = repository.findById(opportunityId)
+                .orElseThrow(() -> new ResourceNotFoundException("Oportunidade não encontrada."));
+        opportunity.finish();
+    }
+
+    private OpportunitySummary summarize(Opportunity opportunity) {
+        return new OpportunitySummary(
+                opportunity.getId(),
+                opportunity.getTitle(),
                 opportunity.getProfessor().getId(),
                 opportunity.getStatus()
         );

@@ -46,7 +46,7 @@ public class ProjectProposalController {
     public ResponseEntity<List<ProjectProposalResponse>> listByStudent(
             @AuthenticationPrincipal AuthenticatedUser principal
     ) {
-        return ResponseEntity.ok(service.listByStudent(principal.getUser().getId()));
+        return ResponseEntity.ok(service.listByStudent(principal.getUser()));
     }
 
     @GetMapping("/project-proposals/{projectProposalId}")
@@ -63,7 +63,7 @@ public class ProjectProposalController {
             @RequestBody @Valid ProjectProposalCreate dto,
             UriComponentsBuilder uriBuilder
     ) {
-        ProjectProposalResponse response = service.createForStudent(principal.getUser().getId(), dto);
+        ProjectProposalResponse response = service.createForStudent(principal.getUser(), dto);
 
         URI uri = uriBuilder.path("/api/v1/project-proposals/{id}")
                 .buildAndExpand(response.id())
@@ -73,26 +73,32 @@ public class ProjectProposalController {
     }
 
     @PutMapping("/project-proposals/{projectProposalId}")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ProjectProposalResponse> update(
             @PathVariable Long projectProposalId,
-            @RequestBody @Valid ProjectProposalUpdate dto
+            @RequestBody @Valid ProjectProposalUpdate dto,
+            @AuthenticationPrincipal AuthenticatedUser principal
     ) {
-        return ResponseEntity.ok(service.update(projectProposalId, dto));
+        return ResponseEntity.ok(service.update(projectProposalId, dto, principal.getUser()));
     }
 
     @PatchMapping("/project-proposals/{projectProposalId}")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ProjectProposalResponse> partialUpdate(
             @PathVariable Long projectProposalId,
-            @RequestBody @Valid ProjectProposalPatch dto
+            @RequestBody @Valid ProjectProposalPatch dto,
+            @AuthenticationPrincipal AuthenticatedUser principal
     ) {
-        return ResponseEntity.ok(service.partialUpdate(projectProposalId, dto));
+        return ResponseEntity.ok(service.partialUpdate(projectProposalId, dto, principal.getUser()));
     }
 
     @DeleteMapping("/project-proposals/{projectProposalId}")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<Void> remove(
-            @PathVariable Long projectProposalId
+            @PathVariable Long projectProposalId,
+            @AuthenticationPrincipal AuthenticatedUser principal
     ) {
-        service.remove(projectProposalId);
+        service.remove(projectProposalId, principal.getUser());
         return ResponseEntity.noContent().build();
     }
 }

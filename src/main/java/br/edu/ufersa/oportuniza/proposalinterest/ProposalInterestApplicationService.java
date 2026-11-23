@@ -1,6 +1,5 @@
 package br.edu.ufersa.oportuniza.proposalinterest;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -8,44 +7,45 @@ import org.springframework.transaction.annotation.Transactional;
 
 import br.edu.ufersa.oportuniza.projectproposal.ProjectProposalInternalApi;
 import br.edu.ufersa.oportuniza.projectproposal.ProjectProposalSummary;
-import br.edu.ufersa.oportuniza.proposalinterest.dto.ProposalInterestCreate;
 import br.edu.ufersa.oportuniza.proposalinterest.dto.ProposalInterestPatch;
 import br.edu.ufersa.oportuniza.proposalinterest.dto.ProposalInterestResponse;
 import br.edu.ufersa.oportuniza.proposalinterest.dto.ProposalInterestUpdate;
+import br.edu.ufersa.oportuniza.shared.exception.ResourceAccessDeniedException;
 import br.edu.ufersa.oportuniza.shared.exception.ResourceNotFoundException;
 import br.edu.ufersa.oportuniza.user.User;
-import br.edu.ufersa.oportuniza.user.UserRepository;
 
 @Service
 class ProposalInterestApplicationService {
 
     private final ProposalInterestRepository repository;
     private final ProjectProposalInternalApi projectProposalApi;
-    private final UserRepository userRepository;
     private final ProposalInterestMapper mapper;
+    private final ProposalInterestService domain;
 
     public ProposalInterestApplicationService(
             ProposalInterestRepository repository,
             ProjectProposalInternalApi projectProposalApi,
-            UserRepository userRepository,
-            ProposalInterestMapper mapper
+            ProposalInterestMapper mapper,
+            ProposalInterestService domain
     ) {
         this.repository = repository;
         this.projectProposalApi = projectProposalApi;
-        this.userRepository = userRepository;
         this.mapper = mapper;
+        this.domain = domain;
     }
 
     @Transactional(readOnly = true)
-    public List<ProposalInterestResponse> list() {
-        return mapper.toResponseList(repository.findAll());
+    public List<ProposalInterestResponse> listMine(User user) {
+        return mapper.toResponseList(repository.findByUserId(user.getId()));
     }
 
     @Transactional(readOnly = true)
     public List<ProposalInterestResponse> listByProjectProposal(
-            Long projectProposalId
+            Long projectProposalId,
+            User user
     ) {
         findProjectProposal(projectProposalId);
+        domain.requireProposalOwner(projectProposalId, user);
 
         return mapper.toResponseList(
                 repository.findByProjectProposalId(projectProposalId)
@@ -54,135 +54,64 @@ class ProposalInterestApplicationService {
 
     @Transactional(readOnly = true)
     public ProposalInterestResponse findById(
-            Long proposalInterestId
+            Long proposalInterestId,
+            User user
     ) {
-        return mapper.toResponse(
-                findProposalInterest(proposalInterestId)
-        );
+        ProposalInterest interest = findProposalInterest(proposalInterestId);
+        domain.requireReader(interest, user);
+        return mapper.toResponse(interest);
     }
 
     @Transactional
     public ProposalInterestResponse createForProjectProposal(
             Long projectProposalId,
-            ProposalInterestCreate dto
+            User user
     ) {
         ProjectProposalSummary projectProposal =
                 findProjectProposal(projectProposalId);
-
-        User user = findUser(dto.userId());
-
-        ProposalInterest.Builder builder =
-                new ProposalInterest.Builder(
-                        projectProposal.id(),
-                        user
-                );
-
-        if (dto.status() != null) {
-            builder.withStatus(dto.status());
+        if (projectProposal.studentId().equals(user.getId())) {
+            throw new ResourceAccessDeniedException(
+                    "O autor da proposta não pode demonstrar interesse na própria proposta."
+            );
         }
-
-        if (dto.createdAt() != null) {
-            builder.withCreatedAt(dto.createdAt());
-        }
-
-        ProposalInterest proposalInterest =
-                builder.build();
-
-        ProposalInterest saved =
-                repository.save(proposalInterest);
-
+        ProposalInterest saved = repository.save(mapper.toEntity(projectProposal.id(), user));
         return mapper.toResponse(saved);
     }
 
     @Transactional
     public ProposalInterestResponse update(
             Long proposalInterestId,
-            ProposalInterestUpdate dto
+            ProposalInterestUpdate dto,
+            User user
     ) {
-        findProposalInterest(proposalInterestId);
-
-        ProjectProposalSummary projectProposal =
-                findProjectProposal(dto.projectProposalId());
-
-        User user =
-                findUser(dto.userId());
-
-        ProposalInterest updated =
-                new ProposalInterest.Builder(
-                        projectProposal.id(),
-                        user
-                )
-                        .withId(proposalInterestId)
-                        .withStatus(dto.status())
-                        .withCreatedAt(dto.createdAt())
-                        .build();
-
-        ProposalInterest saved =
-                repository.save(updated);
-
-        return mapper.toResponse(saved);
+        ProposalInterest interest = findProposalInterest(proposalInterestId);
+        domain.requireProposalOwner(interest.getProjectProposalId(), user);
+        interest.updateStatus(dto.status());
+        return mapper.toResponse(repository.save(interest));
     }
 
     @Transactional
     public ProposalInterestResponse partialUpdate(
             Long proposalInterestId,
-            ProposalInterestPatch dto
+            ProposalInterestPatch dto,
+            User user
     ) {
-        ProposalInterest current =
-                findProposalInterest(proposalInterestId);
-
-        Long projectProposalId = current.getProjectProposalId();
-
-        User user =
-                current.getUser();
-
-        InterestStatus status =
-                current.getStatus();
-
-        LocalDateTime createdAt =
-                current.getCreatedAt();
-
-        if (dto.projectProposalId() != null) {
-            projectProposalId =
-                    findProjectProposal(dto.projectProposalId()).id();
-        }
-
-        if (dto.userId() != null) {
-            user =
-                    findUser(dto.userId());
-        }
-
+        ProposalInterest interest = findProposalInterest(proposalInterestId);
+        domain.requireProposalOwner(interest.getProjectProposalId(), user);
         if (dto.status() != null) {
-            status = dto.status();
+            interest.updateStatus(dto.status());
         }
-
-        if (dto.createdAt() != null) {
-            createdAt = dto.createdAt();
-        }
-
-        ProposalInterest updated =
-                new ProposalInterest.Builder(
-                        projectProposalId,
-                        user
-                )
-                        .withId(proposalInterestId)
-                        .withStatus(status)
-                        .withCreatedAt(createdAt)
-                        .build();
-
-        ProposalInterest saved =
-                repository.save(updated);
-
-        return mapper.toResponse(saved);
+        return mapper.toResponse(repository.save(interest));
     }
 
     @Transactional
     public void remove(
-            Long proposalInterestId
+            Long proposalInterestId,
+            User user
     ) {
         ProposalInterest proposalInterest =
                 findProposalInterest(proposalInterestId);
-
+        domain.requireDeleteAccess(proposalInterest, user);
         repository.delete(proposalInterest);
     }
 
@@ -198,21 +127,9 @@ class ProposalInterestApplicationService {
                 );
     }
 
-        private ProjectProposalSummary findProjectProposal(
+    private ProjectProposalSummary findProjectProposal(
             Long projectProposalId
     ) {
         return projectProposalApi.findById(projectProposalId);
-    }
-
-    private User findUser(
-            Long userId
-    ) {
-        return userRepository
-                .findById(userId)
-                .orElseThrow(
-                        () -> new ResourceNotFoundException(
-                                "Usuário não encontrado."
-                        )
-                );
     }
 }

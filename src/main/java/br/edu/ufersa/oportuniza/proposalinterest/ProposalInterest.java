@@ -3,6 +3,7 @@ package br.edu.ufersa.oportuniza.proposalinterest;
 import java.time.LocalDateTime;
 
 import br.edu.ufersa.oportuniza.shared.exception.BusinessValidation;
+import br.edu.ufersa.oportuniza.shared.exception.BusinessRuleViolationException;
 import br.edu.ufersa.oportuniza.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -56,11 +57,22 @@ class ProposalInterest {
     }
 
     public void accept() {
-        this.status = InterestStatus.ACCEPTED;
+        updateStatus(InterestStatus.ACCEPTED);
     }
 
     public void reject() {
-        this.status = InterestStatus.REJECTED;
+        updateStatus(InterestStatus.REJECTED);
+    }
+
+    public void updateStatus(InterestStatus nextStatus) {
+        InterestStatus status = BusinessValidation.requireNonNull(
+                nextStatus,
+                "O status do interesse é obrigatório."
+        );
+        if (!this.status.canTransitionTo(status)) {
+            throw new BusinessRuleViolationException("Transição de status inválida para o interesse.");
+        }
+        this.status = status;
     }
 
     public Long getId() {

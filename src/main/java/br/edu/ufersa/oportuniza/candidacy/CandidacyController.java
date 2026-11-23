@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import br.edu.ufersa.oportuniza.auth.AuthenticatedUser;
-import br.edu.ufersa.oportuniza.candidacy.dto.CandidacyCreate;
 import br.edu.ufersa.oportuniza.candidacy.dto.CandidacyPatch;
 import br.edu.ufersa.oportuniza.candidacy.dto.CandidacyResponse;
 import br.edu.ufersa.oportuniza.candidacy.dto.CandidacyUpdate;
@@ -37,15 +36,20 @@ public class CandidacyController {
     }
 
     @GetMapping("/candidacies")
-    public ResponseEntity<List<CandidacyResponse>> list() {
-        return ResponseEntity.ok(service.list());
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<List<CandidacyResponse>> list(
+            @AuthenticationPrincipal AuthenticatedUser principal
+    ) {
+        return ResponseEntity.ok(service.listByStudent(principal.getUser()));
     }
 
     @GetMapping("/opportunities/{opportunityId}/candidacies")
+    @PreAuthorize("hasRole('PROFESSOR')")
     public ResponseEntity<List<CandidacyResponse>> listByOpportunity(
-            @PathVariable Long opportunityId
+            @PathVariable Long opportunityId,
+            @AuthenticationPrincipal AuthenticatedUser principal
     ) {
-        return ResponseEntity.ok(service.listByOpportunity(opportunityId));
+        return ResponseEntity.ok(service.listByOpportunity(opportunityId, principal.getUser()));
     }
 
     @GetMapping("/students/candidacies")
@@ -53,23 +57,26 @@ public class CandidacyController {
     public ResponseEntity<List<CandidacyResponse>> listByStudent(
             @AuthenticationPrincipal AuthenticatedUser principal
     ) {
-        return ResponseEntity.ok(service.listByStudent(principal.getUser().getId()));
+        return ResponseEntity.ok(service.listByStudent(principal.getUser()));
     }
 
     @GetMapping("/candidacies/{candidacyId}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'PROFESSOR')")
     public ResponseEntity<CandidacyResponse> findById(
-            @PathVariable Long candidacyId
+            @PathVariable Long candidacyId,
+            @AuthenticationPrincipal AuthenticatedUser principal
     ) {
-        return ResponseEntity.ok(service.findById(candidacyId));
+        return ResponseEntity.ok(service.findById(candidacyId, principal.getUser()));
     }
 
     @PostMapping("/opportunities/{opportunityId}/candidacies")
+    @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<CandidacyResponse> createForOpportunity(
             @PathVariable Long opportunityId,
-            @RequestBody @Valid CandidacyCreate dto,
+            @AuthenticationPrincipal AuthenticatedUser principal,
             UriComponentsBuilder uriBuilder
     ) {
-        CandidacyResponse response = service.createForOpportunity(opportunityId, dto);
+        CandidacyResponse response = service.createForOpportunity(opportunityId, principal.getUser());
 
         URI uri = uriBuilder.path("/api/v1/candidacies/{id}")
                 .buildAndExpand(response.id())
@@ -79,26 +86,32 @@ public class CandidacyController {
     }
 
     @PutMapping("/candidacies/{candidacyId}")
+    @PreAuthorize("hasRole('PROFESSOR')")
     public ResponseEntity<CandidacyResponse> update(
             @PathVariable Long candidacyId,
-            @RequestBody @Valid CandidacyUpdate dto
+            @RequestBody @Valid CandidacyUpdate dto,
+            @AuthenticationPrincipal AuthenticatedUser principal
     ) {
-        return ResponseEntity.ok(service.update(candidacyId, dto));
+        return ResponseEntity.ok(service.update(candidacyId, dto, principal.getUser()));
     }
 
     @PatchMapping("/candidacies/{candidacyId}")
+    @PreAuthorize("hasRole('PROFESSOR')")
     public ResponseEntity<CandidacyResponse> partialUpdate(
             @PathVariable Long candidacyId,
-            @RequestBody @Valid CandidacyPatch dto
+            @RequestBody @Valid CandidacyPatch dto,
+            @AuthenticationPrincipal AuthenticatedUser principal
     ) {
-        return ResponseEntity.ok(service.partialUpdate(candidacyId, dto));
+        return ResponseEntity.ok(service.partialUpdate(candidacyId, dto, principal.getUser()));
     }
 
     @DeleteMapping("/candidacies/{candidacyId}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'PROFESSOR')")
     public ResponseEntity<Void> remove(
-            @PathVariable Long candidacyId
+            @PathVariable Long candidacyId,
+            @AuthenticationPrincipal AuthenticatedUser principal
     ) {
-        service.remove(candidacyId);
+        service.remove(candidacyId, principal.getUser());
         return ResponseEntity.noContent().build();
     }
 }
